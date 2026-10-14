@@ -1,4 +1,4 @@
-# How to ADHD — Parent Pilot
+# How to ADHD - Parent Pilot
 
 Standalone, no-build, no-dependency, mobile-first Hebrew/English interactive parent-guidance app. **Not connected to KazoAni, TAB@Work or Lovable.**
 
@@ -29,3 +29,8 @@ Static Vercel framework auto-detection can be disabled. Keep preview protected w
 ## Replaceable artwork
 
 The SVG Bridget below is an original in-app illustration and placeholder for the approved portrait, which was not available as an image attachment in this task. Do not claim it reproduces the original exactly.
+
+
+---
+
+by Danya Dotan - Bridge-iT | 2026
