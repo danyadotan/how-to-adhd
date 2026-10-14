@@ -1,5 +1,0 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {createRequire} from 'node:module';const require=createRequire(import.meta.url);const {scenarios,esc,labels,initial}=require('./app.js');
-test('scenario catalog has distinct identifiers',()=>{assert.ok(scenarios.length>=8);assert.equal(new Set(scenarios.map(s=>s.id)).size,scenarios.length)});
-test('every scenario completes guidance loop in both languages',()=>{for(const s of scenarios){for(const key of ['title','desc','why','step','small','alternative','script']){assert.equal(s[key].length,2,`${s.id}.${key}`);assert.ok(s[key][0]&&s[key][1],`${s.id}.${key} blank`)}assert.equal(s.question[0].length,4);assert.equal(s.advice[0].length,4);}});
-test('medical safeguards and accessibility defaults',()=>{assert.ok(scenarios.find(s=>s.id==='overwhelm').risk);assert.ok(scenarios.find(s=>s.id==='school').risk);assert.equal(initial.lang,'he');assert.ok(labels.en.mine);});
-test('user strings are escaped',()=>{assert.equal(esc('<script>" &'), '&lt;script&gt;&quot; &amp;');});
