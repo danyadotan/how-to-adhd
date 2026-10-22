@@ -34,3 +34,4 @@ The SVG Bridget below is an original in-app illustration and placeholder for the
 ---
 
 by Danya Dotan - Bridge-iT | 2026
+
