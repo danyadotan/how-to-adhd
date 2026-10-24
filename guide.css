@@ -22,3 +22,8 @@ body{font-family:Arial,sans-serif;background:#f5f8fa;color:#203047;margin:0;line
 .guide-subtitle{font-size:1.3rem}
 /* Keep editable action text within narrow screens. */
 #arena-phrase{box-sizing:border-box;max-width:100%}
+
+/* Optional narration status; visible without blocking the exercise. */
+.arena-audio-status{min-height:1.4em;margin:0;padding:0 24px;color:#345466;font-size:.88rem}
+.arena-icon:focus-visible{outline:3px solid #725aa6;outline-offset:3px}
+@media(max-width:680px){.arena-audio-status{padding:0 14px}.arena-tools{flex-wrap:wrap;justify-content:flex-end}}
