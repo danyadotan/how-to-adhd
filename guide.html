@@ -75,13 +75,14 @@
       <div><span class="arena-mini">TAB · זירת תרגול</span><h2 id="arena-title">מתחילים ברוגע</h2></div>
       <div class="arena-tools">
         <button id="arena-language" class="arena-icon" aria-label="Switch to English">EN</button>
-        <button id="arena-voice" class="arena-icon" aria-pressed="false" aria-label="הפעלת הקראה">🔇</button>
+        <button id="arena-voice" class="arena-icon" type="button" aria-pressed="false" aria-label="ניגון קריינות לשלב הנוכחי" aria-describedby="arena-audio-status">▶</button>
         <button id="arena-contrast" class="arena-icon" aria-pressed="false" aria-label="ניגודיות גבוהה">◐</button>
         <button id="arena-close" class="arena-icon" aria-label="סגירת זירת התרגול">×</button>
       </div>
     </header>
     <div class="arena-progress" aria-label="התקדמות"><span id="arena-progress-bar"></span></div>
     <div id="arena-stage" class="arena-stage" tabindex="-1"></div>
+    <p id="arena-audio-status" class="arena-audio-status" role="status" aria-live="polite"></p>
     <footer class="arena-footer"><span id="arena-privacy">הבחירות נשארות במכשיר הזה ולא נשלחות.</span><button id="arena-bouncer-link">בדיקת פרטיות</button></footer>
   </div>
 </div>
