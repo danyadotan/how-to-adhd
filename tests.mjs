@@ -8,3 +8,22 @@ test('unified navigation and deep resources are present',()=>{const index=readFi
 test('spoken-language editing and soft landing are available',()=>{const arena=readFileSync(new URL('./guide-arena.js',import.meta.url),'utf8');assert.match(arena,/id="arena-phrase"/);assert.match(arena,/customPhrase/);assert.match(arena,/כרית לנחיתה רכה/);assert.match(arena,/מסיבת ריקודים/);assert.match(arena,/cardText\(\)/)});
 test('Bridget tour, reminders and side TAB are wired',()=>{const app=readFileSync(new URL('./app.js',import.meta.url),'utf8');const css=readFileSync(new URL('./styles.css',import.meta.url),'utf8');const guideTab=readFileSync(new URL('./guide-tab.js',import.meta.url),'utf8');assert.match(app,/openBridgetTour/);assert.match(app,/thoughtAnchor/);assert.match(css,/\.bridget-arrow/);assert.match(css,/writing-mode:vertical-rl/);assert.match(guideTab,/thoughtNotes/)});
 
+
+test('narration stays user initiated and has accessible controls',()=>{
+  const arena=readFileSync(new URL('./guide-arena.js',import.meta.url),'utf8');
+  const guide=readFileSync(new URL('./guide.html',import.meta.url),'utf8');
+  assert.match(arena,/function toggleNarration\(\)/);
+  assert.match(arena,/function pauseNarration\(\)/);
+  assert.match(arena,/function resumeNarration\(\)/);
+  assert.match(arena,/visibilitychange/);
+  assert.doesNotMatch(arena,/speak\(\);/);
+  assert.match(guide,/id="arena-audio-status"/);
+  assert.match(guide,/aria-describedby="arena-audio-status"/);
+});
+test('manual recording preparation checks local files without a browser API key',()=>{
+  const prepare=readFileSync(new URL('./prepare-voice.mjs',import.meta.url),'utf8');
+  assert.match(prepare,/existsSync/);
+  assert.match(prepare,/audioFormats/);
+  assert.match(prepare,/clip\.url =/);
+  assert.match(prepare,/--generate/);
+});

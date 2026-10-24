@@ -294,7 +294,6 @@
   let s = {
     step: 0,
     lang: "he",
-    voice: false,
     parent: "🧑🏻",
     child: "🧒🏻",
     scenario: "screen",
@@ -335,30 +334,147 @@
     );
   }
   let narrationAudio = null;
-  function stopNarration() {
-    if(narrationAudio) { narrationAudio.pause(); narrationAudio = null; }
-    if("speechSynthesis" in window) window.speechSynthesis.cancel();
+  let narrationUtterance = null;
+  let narrationState = "idle";
+  let playbackGeneration = 0;
+  const narrationControl = $("arena-voice");
+  const narrationStatus = $("arena-audio-status");
+
+  function narrationMessage(he, en) {
+    return s.lang === "he" ? he : en;
   }
-  function speak() {
-    stopNarration();
-    if(!s.voice) return;
-    const key = `${s.lang}-${s.step}${s.step===4?'-'+s.scenario:''}`;
-    const clip = (window.ARENA_VOICE || {})[key];
-    if(clip && clip.url) {
-      narrationAudio = new Audio(clip.url);
-      narrationAudio.play().catch(()=>{ $("arena-privacy").textContent = s.lang==='he' ? 'לא ניתן לנגן כרגע. הטקסט זמין לקריאה.' : 'Audio unavailable. You can read the text.'; });
+  function setNarrationState(next) {
+    narrationState = next;
+    const playing = next === "playing";
+    narrationControl.setAttribute("aria-pressed", String(playing));
+    narrationControl.textContent = playing ? "⏸" : "▶";
+    narrationControl.setAttribute(
+      "aria-label",
+      next === "paused"
+        ? narrationMessage("חידוש הקריינות", "Resume narration")
+        : playing
+          ? narrationMessage("השהיית הקריינות", "Pause narration")
+          : narrationMessage("ניגון קריינות לשלב הנוכחי", "Play narration for this step"),
+    );
+  }
+  function stopNarration() {
+    playbackGeneration += 1;
+    if (narrationAudio) {
+      narrationAudio.onended = null;
+      narrationAudio.onerror = null;
+      narrationAudio.pause();
+      narrationAudio = null;
+    }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    narrationUtterance = null;
+    setNarrationState("idle");
+    narrationStatus.textContent = "";
+  }
+  function finishNarration(generation) {
+    if (generation !== playbackGeneration) return;
+    narrationAudio = null;
+    narrationUtterance = null;
+    setNarrationState("idle");
+    narrationStatus.textContent = narrationMessage("ההקראה הסתיימה.", "Narration finished.");
+  }
+  function playDeviceSpeech(text, generation) {
+    if (!text || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+      setNarrationState("idle");
+      narrationStatus.textContent = narrationMessage(
+        "הקריינות אינה זמינה. אפשר להמשיך לקרוא ולתרגל כרגיל.",
+        "Narration is unavailable. You can still read and practice.",
+      );
       return;
     }
-    if (!s.voice || !("speechSynthesis" in window)) return;
-    const text = clip ? clip.text : stage.querySelector('.arena-subtitle')?.textContent;
-    if(!text) return;
-    const u = new SpeechSynthesisUtterance(text.replace(/[\/]/g, ' ').replace(/[🎮☀️✏️]/gu,''));
-    u.lang = s.lang === "he" ? "he-IL" : "en-US";
-    const voice = window.speechSynthesis.getVoices().find(v=>v.lang.startsWith(s.lang));
-    if(voice) u.voice = voice;
-    u.rate = 0.92;
-    $("arena-privacy").textContent = s.lang==='he' ? 'קול המכשיר · קול ElevenLabs טרם חובר' : 'Device voice · ElevenLabs voice is not connected yet';
-    window.speechSynthesis.speak(u);
+    try {
+      const utterance = new SpeechSynthesisUtterance(text.replace(/[\\/]/g, " ").replace(/[🎮☀️✏️]/gu, ""));
+      utterance.lang = s.lang === "he" ? "he-IL" : "en-US";
+      const deviceVoice = window.speechSynthesis.getVoices().find((voice) => voice.lang.startsWith(s.lang));
+      if (deviceVoice) utterance.voice = deviceVoice;
+      utterance.rate = 0.92;
+      narrationUtterance = utterance;
+      utterance.onend = () => {
+        if (narrationUtterance === utterance) finishNarration(generation);
+      };
+      utterance.onerror = () => {
+        if (generation !== playbackGeneration || narrationUtterance !== utterance) return;
+        narrationUtterance = null;
+        setNarrationState("idle");
+        narrationStatus.textContent = narrationMessage(
+          "לא ניתן לנגן כרגע. הטקסט זמין לקריאה.",
+          "Audio unavailable. The text remains available.",
+        );
+      };
+      window.speechSynthesis.speak(utterance);
+      setNarrationState("playing");
+      narrationStatus.textContent = narrationMessage("מושמע קול המכשיר.", "Playing device voice.");
+    } catch (_) {
+      narrationUtterance = null;
+      setNarrationState("idle");
+      narrationStatus.textContent = narrationMessage(
+        "לא ניתן לנגן כרגע. הטקסט זמין לקריאה.",
+        "Audio unavailable. The text remains available.",
+      );
+    }
+  }
+  function startNarration() {
+    // Called only by the explicit audio button, never from render or navigation.
+    const generation = ++playbackGeneration;
+    const key = `${s.lang}-${s.step}${s.step === 4 ? "-" + s.scenario : ""}`;
+    const clip = (window.ARENA_VOICE || {})[key];
+    const text = clip?.text || stage.querySelector(".arena-subtitle")?.textContent;
+    if (clip?.url) {
+      try {
+        const audio = new Audio(clip.url);
+        audio.preload = "none";
+        narrationAudio = audio;
+        audio.onended = () => finishNarration(generation);
+        const onFailure = () => {
+          if (generation !== playbackGeneration || narrationAudio !== audio || narrationState !== "playing") return;
+          audio.pause();
+          narrationAudio = null;
+          playDeviceSpeech(text, generation);
+        };
+        audio.onerror = onFailure;
+        setNarrationState("playing");
+        narrationStatus.textContent = narrationMessage("מושמעת הקלטה של ברידג׳ט.", "Playing recorded narration.");
+        audio.play().catch(onFailure);
+        return;
+      } catch (_) {
+        narrationAudio = null;
+      }
+    }
+    playDeviceSpeech(text, generation);
+  }
+  function pauseNarration() {
+    if (narrationState !== "playing") return;
+    if (narrationAudio) narrationAudio.pause();
+    else if (narrationUtterance && "speechSynthesis" in window) window.speechSynthesis.pause();
+    setNarrationState("paused");
+    narrationStatus.textContent = narrationMessage("הקריינות הושהתה.", "Narration paused.");
+  }
+  function resumeNarration() {
+    if (narrationState !== "paused") return;
+    if (narrationAudio) {
+      const generation = playbackGeneration;
+      setNarrationState("playing");
+      narrationStatus.textContent = narrationMessage("מושמעת הקלטה של ברידג׳ט.", "Playing recorded narration.");
+      narrationAudio.play().catch(() => {
+        if (generation === playbackGeneration) {
+          stopNarration();
+          narrationStatus.textContent = narrationMessage("לא ניתן לחדש. אפשר לנסות לנגן שוב.", "Cannot resume. Try playing again.");
+        }
+      });
+    } else if (narrationUtterance && "speechSynthesis" in window) {
+      window.speechSynthesis.resume();
+      setNarrationState("playing");
+      narrationStatus.textContent = narrationMessage("מושמע קול המכשיר.", "Playing device voice.");
+    } else startNarration();
+  }
+  function toggleNarration() {
+    if (narrationState === "playing") pauseNarration();
+    else if (narrationState === "paused") resumeNarration();
+    else startNarration();
   }
   function setStep(n) {
     s.step = n;
@@ -366,6 +482,7 @@
     stage.focus({ preventScroll: true });
   }
   function render() {
+    stopNarration();
     modal.dir = s.lang === "he" ? "rtl" : "ltr";
     title.textContent = tr(
       s.step === 0
@@ -389,7 +506,6 @@
     else if (s.step === 3) profile();
     else if (s.step === 4) play();
     else shareCard();
-    speak();
   }
   function intro() {
     const note =
@@ -846,12 +962,10 @@
     s.lang = s.lang === "he" ? "en" : "he";
     render();
   };
-  $("arena-voice").onclick = () => {
-    s.voice = !s.voice;
-    $("arena-voice").setAttribute("aria-pressed", String(s.voice));
-    $("arena-voice").textContent = s.voice ? "🔊" : "🔇";
-    speak();
-  };
+  $("arena-voice").onclick = toggleNarration;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && !modal.hidden) pauseNarration();
+  });
   $("arena-contrast").onclick = () => {
     modal.classList.toggle("arena-high-contrast");
     $("arena-contrast").setAttribute(
