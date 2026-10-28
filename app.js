@@ -469,9 +469,43 @@ function field(s, key) {
 function iconCard(s) {
   return `<article class="card clickable" data-scenario="${s.id}" tabindex="0" role="button" aria-label="${title(s)}"><div class="iconbox" aria-hidden="true">${s.emoji}</div><h3>${title(s)}</h3><p>${field(s, "desc")}</p><span class="bottom">${t("בואו נתחיל בצעד אחד ←", "Explore one small step →")}</span></article>`;
 }
+// Closed choices only: no scenario, saved steps, identifiers or personal text.
+const pilotQuestions = [
+  ["relevance", "מצאתם סיטואציה רלוונטית?", "Did you find a relevant situation?", [["yes","כן","Yes"],["partly","חלקית","Partly"],["no","לא","No"]]],
+  ["action", "הצלחתם לבצע צעד שהוצע?", "Were you able to carry out a suggested step?", [["yes","כן","Yes"],["partly","חלק ממנו","Part of it"],["no","ניסיתי ולא הצלחתי","Tried, but could not"],["not_yet","עוד לא ניסיתי","Have not tried yet"]]],
+  ["return", "תרצו להשתמש באפליקציה שוב?", "Would you use the app again?", [["yes","כן","Yes"],["maybe","אולי","Maybe"],["no","לא","No"]]],
+  ["barrier", "איפה היה קשה? (לא חובה)", "Where was it difficult? (optional)", [["skip","מעדיפים לא לענות","Prefer not to answer"],["none","לא היה קושי","No difficulty"],["finding","למצוא סיטואציה","Finding a situation"],["understanding","להבין את ההצעה","Understanding the suggestion"],["adapting","להתאים את הצעד","Adapting the step"],["trying","לבצע בבית","Trying it at home"],["saving","לשמור או לחזור לצעד","Saving or revisiting"],["technical","תקלה טכנית","Technical problem"]]]
+];
+function pilotFeedbackText(values) {
+  if (values.consent !== "yes") return null;
+  const lines = [];
+  for (const [key, he, en, options] of pilotQuestions) {
+    const choice = options.find(([id]) => id === (values[key] || (key === "barrier" ? "skip" : "")));
+    if (!choice) return null;
+    lines.push(`${he} / ${en}: ${choice[1]} / ${choice[2]}`);
+  }
+  return "How-to-ADHD | Pilot feedback v1\n" + lines.join("\n");
+}
+function openPilotFeedback() {
+  modal({heading:t("משוב קצר לפיילוט", "Short pilot feedback"),body:`<p>${t("לא נבקש שמות, פרטי ילדים או מידע רפואי. התשובות אינן נשמרות. אפשר לסגור בכל רגע.", "No names, child details or medical information. Answers are not saved. You can close at any time.")}</p><form id="pilotForm">${pilotQuestions.map(([key,he,en,options])=>`<fieldset><legend>${t(he,en)}</legend>${options.map(([id,h,e])=>`<label class="pilot-choice"><input type="radio" name="${key}" value="${id}" ${key !== "barrier" ? "required" : ""}> ${t(h,e)}</label>`).join("")}</fieldset>`).join("")}<p class="mini-copy">${t("יועתקו רק התשובות שסימנתם וכותרת גרסת המשוב. לא מצורפים הסיטואציה, הצעדים השמורים או פרטי המכשיר. ההעתקה אינה שליחה.", "Only selected answers and the feedback version heading are copied. No situation, saved steps or device details are attached. Copying does not send anything.")}</p><label class="pilot-choice"><input type="checkbox" name="consent" value="yes" required> ${t("אני מסכימ/ה להעתיק את התשובות המסומנות כדי לשתף אותן עם צוות הפיילוט.", "I consent to copy the selected answers to share with the pilot team.")}</label><button type="button" class="btn primary" data-action="copyFeedback">${t("העתקת התשובות שסימנתי", "Copy my selected answers")}</button><p id="feedbackStatus" role="status"></p></form><p class="mini-copy">${t("לאחר ההעתקה אפשר להדביק בשיחה עם מי שהזמין אתכם לפיילוט. שירות ההודעות עשוי לזהות אתכם; המשוב אינו מובטח כאנונימי.", "After copying, paste into your conversation with your pilot organizer. Your messaging service may identify you; feedback is not guaranteed anonymous.")}</p>`});
+}
+function bridgetGuide() {
+  const detail = state.view === "detail";
+  const stage = state.view === "mine" ? 4 : detail ? (state.stepMode !== "normal" || state.followQuestion !== null ? 3 : 2) : state.view === "home" ? 0 : 1;
+  const messages = [
+    ["אני ברידג׳ט. נתחיל ברגע אחד, ונמצא צעד קטן שאפשר לנסות. אתם בוחרים את הקצב.", "I’m Bridget. We’ll start with one moment and find a small step to try. You set the pace."],
+    ["נבחר סיטואציה שמוכרת לכם. אפשר גם לחזור ולהחליף בחירה.", "Choose a familiar situation. You can always go back and choose another."],
+    ["נקרא הצעה אחת. אם היא גדולה מדי, אפשר להקטין אותה או לבחור דרך אחרת.", "Read one suggestion. If it feels too big, make it smaller or try another way."],
+    ["מצאתם דרך שמתאימה יותר? אפשר לשמור ולנסות בזמן שנכון לכם.", "Found a better fit? Save it and try when the time feels right."],
+    ["אחרי ניסיון אפשר לחזור לצעד. גם ניסיון חלקי עוזר ללמוד. אם מתאים, שתפו במשוב קצר.", "Return after trying. A partial attempt also helps us learn. Share short feedback if you wish."]
+  ];
+  const names = [["בחירה","Choose"],["הצעה","Suggestion"],["התאמה","Adapt"],["ניסיון וחזרה","Try and revisit"]];
+  return `<aside class="bridget-guide" aria-label="${t("ברידג׳ט מלווה אתכם", "Bridget guides you")}"><img src="bridget-next-step.webp" width="80" height="100" alt=""><div><strong>${t("ברידג׳ט · צעד אחד בכל פעם", "Bridget · One step at a time")}</strong><p>${t(...messages[stage])}</p><ol class="journey">${names.map(([he,en],i)=>`<li ${i === Math.max(0,stage-1) ? 'aria-current="step"' : ''}>${t(he,en)}</li>`).join("")}</ol><div class="action-row"><button class="text-link" ${detail ? 'data-action="saveStep"' : 'data-view="scenarios"'}>${detail ? t("אשמור לנסות", "Save to try") : t("לבחירת סיטואציה", "Choose a situation")}</button><button class="text-link" data-action="pilotFeedback">${t("משוב קצר לפיילוט", "Short pilot feedback")}</button></div></div></aside>`;
+}
+
 function renderHome() {
   const featured = [scenarios[0], scenarios[1], scenarios[2]];
-  return `<section class="hero"><div><span class="eyebrow">✦ ${t("מרחב חדש להורים · גרסת פיילוט", "A new space for parents · Pilot edition")}</span><h1>${t('פחות ״מה עושים עכשיו?״<br><span class="highlight">יותר צעד קטן קדימה.</span>', 'Less “what do I do now?”<br><span class="highlight">One small step forward.</span>')}</h1><p class="lead">${t("רגע קשה בבית? בוחרים מה קורה ומוצאים דבר אחד שאפשר לנסות. בלי שיפוטיות, בקצב שלכם.", "Practical tools for the moments when attention, emotions and everyday life collide. No judgment, no overwhelm — just one thing to try.")}</p><div class="hero-actions"><button class="btn primary" data-action="welcome">${t("בואו נמצא צעד ראשון ←", "Find my first step →")}</button><button class="text-link" data-action="bridgetTour">${t("קודם, סיבוב קצר עם ברידג׳ט", "First, a quick tour with Bridget")}</button></div><p class="hero-note">✓ ${t("לא צריך הרשמה · ללא הזנת פרטים על הילדים · 1–2 דקות לצעד ראשון", "No account · No child details required · 1–2 minutes to a first step")}</p></div><div class="bridget-scene"><div class="speech">${t("היי, אני ברידג׳ט ✨<br>מה הלאה?", "Hi, I’m Bridget ✨<br>What’s next?")}</div><img class="bridget bridget-picture" src="bridget-next-step.webp" alt="Bridget, your friendly guide, presenting the next step" width="500" height="625" loading="eager" decoding="async"></div></section><div class="section-head"><div><h2>${t("מוכר לכם מהבית?", "Does this feel familiar?")}</h2><p>${t("בחרו רגע אמיתי. נחשוב יחד על הצעד הבא.", "Choose a real moment. Find the next practical move.")}</p></div><button class="text-link" data-view="scenarios">${t("כל הסיטואציות ←", "See all situations →")}</button></div><div class="cards">${featured.map(iconCard).join("")}</div><section class="steps-band"><div><h3>${t("הדרך של TAB: פחות לחשוב, יותר להתחיל", "The TAB way: start, don’t spiral")}</h3><p>${t("כל דבר גדול מתחיל במהלך קטן, בהסכמה שלכם.", "Every big challenge begins with one consent-based action.")}</p></div><div class="mini-step"><strong>01</strong>${t("מבינים מה קורה", "Understand the moment")}</div><div class="mini-step"><strong>02</strong>${t("בוחרים פעולה אחת", "Choose one action")}</div><div class="mini-step"><strong>03</strong>${t("מנסים, לומדים, ממשיכים", "Try, learn, continue")}</div></section><div class="section-head"><div><h2>${t("לפעמים צריך רק משפט אחד טוב", "Sometimes one sentence helps")}</h2><p>${t("תרגול קצר, בלי ציונים ובלי מבחן", "A tiny rehearsal, no scores or judgment")}</p></div></div><div class="card clickable" role="button" tabindex="0" data-action="sim" style="min-height:145px;background:#eaf1ec;border-color:#d8e8db"><div class="iconbox" style="background:white">🎭</div><h3>${t("נסו שיחה לפני שהיא מתרחשת", "Practice a conversation before it happens")}</h3><p>${t("שתי תגובות אפשריות, והזדמנות לבחור מחדש.", "Two response options and a chance to try again.")}</p><span class="bottom">${t("נכנסים לתרגול ←", "Start practice →")}</span></div>`;
+  return `<section class="hero"><div><span class="eyebrow">✦ ${t("מרחב חדש להורים · גרסת פיילוט", "A new space for parents · Pilot edition")}</span><h1>${t('פחות ״מה עושים עכשיו?״<br><span class="highlight">יותר צעד קטן קדימה.</span>', 'Less “what do I do now?”<br><span class="highlight">One small step forward.</span>')}</h1><p class="lead">${t("רגע קשה בבית? בוחרים מה קורה ומוצאים דבר אחד שאפשר לנסות. בלי שיפוטיות, בקצב שלכם.", "Practical tools for the moments when attention, emotions and everyday life collide. No judgment, no overwhelm — just one thing to try.")}</p><div class="hero-actions"><button class="btn primary" data-action="welcome">${t("בואו נמצא צעד ראשון ←", "Find my first step →")}</button><button class="text-link" data-action="bridgetTour">${t("קודם, סיבוב קצר עם ברידג׳ט", "First, a quick tour with Bridget")}</button></div><p class="hero-note">✓ ${t("לא צריך הרשמה · ללא הזנת פרטים על הילדים · 1–2 דקות לצעד ראשון", "No account · No child details required · 1–2 minutes to a first step")}</p></div><div class="bridget-scene"><div class="speech">${t("היי, אני ברידג׳ט ✨<br>מה הלאה?", "Hi, I’m Bridget ✨<br>What’s next?")}</div><img class="bridget bridget-picture" src="bridget-next-step.webp" alt="Bridget, your friendly guide, presenting the next step" width="500" height="625" loading="eager" decoding="async"></div></section><div class="section-head"><div><h2>${t("מוכר לכם מהבית?", "Does this feel familiar?")}</h2><p>${t("בחרו רגע אמיתי. נחשוב יחד על הצעד הבא.", "Choose a real moment. Find the next practical move.")}</p></div><button class="text-link" data-view="scenarios">${t("כל הסיטואציות ←", "See all situations →")}</button></div><div class="cards">${featured.map(iconCard).join("")}</div><section class="steps-band"><div><h3>${t("הדרך של Bridget: פחות לחשוב, יותר להתחיל", "The Bridget way: start, don’t spiral")}</h3><p>${t("כל דבר גדול מתחיל במהלך קטן, בהסכמה שלכם.", "Every big challenge begins with one consent-based action.")}</p></div><div class="mini-step"><strong>01</strong>${t("מבינים מה קורה", "Understand the moment")}</div><div class="mini-step"><strong>02</strong>${t("בוחרים פעולה אחת", "Choose one action")}</div><div class="mini-step"><strong>03</strong>${t("מנסים, לומדים, ממשיכים", "Try, learn, continue")}</div></section><div class="section-head"><div><h2>${t("לפעמים צריך רק משפט אחד טוב", "Sometimes one sentence helps")}</h2><p>${t("תרגול קצר, בלי ציונים ובלי מבחן", "A tiny rehearsal, no scores or judgment")}</p></div></div><div class="card clickable" role="button" tabindex="0" data-action="sim" style="min-height:145px;background:#eaf1ec;border-color:#d8e8db"><div class="iconbox" style="background:white">🎭</div><h3>${t("נסו שיחה לפני שהיא מתרחשת", "Practice a conversation before it happens")}</h3><p>${t("שתי תגובות אפשריות, והזדמנות לבחור מחדש.", "Two response options and a chance to try again.")}</p><span class="bottom">${t("נכנסים לתרגול ←", "Start practice →")}</span></div>`;
 }
 function renderScenarios() {
   const ages = [
@@ -502,7 +536,7 @@ function renderDetail() {
     chosen === null
       ? ""
       : `<div class="inline-feedback">${esc(ans[state.lang === "he" ? chosen : chosen + 2])}</div>`;
-  return `<div class="detail-wrap"><button class="back" data-view="scenarios">${t("→ חזרה לכל הסיטואציות", "← Back to situations")}</button><article class="detail"><span class="eyebrow">${t("צעד אחד, בקצב שלכם", "One step, your pace")}</span><h1>${s.emoji} ${title(s)}</h1><p class="summary">${field(s, "desc")}</p><p class="hint">${field(s, "why")}</p><section class="step-panel" aria-label="${t("הצעד הבא", "Next step")}"><div class="tag">✳ TAB · ${t("מה אפשר לנסות עכשיו", "What to try next")}</div><h2>${field(s, state.stepMode === "small" ? "small" : state.stepMode === "alternative" ? "alternative" : "step")}</h2><div class="script"><strong>${t("משפט שאפשר לומר:", "Words you can use:")}</strong><br>${field(s, "script")}</div><div class="action-row"><button class="btn secondary" data-action="stepMode" data-mode="small">${t("תעשו את זה קטן יותר", "Make it smaller")}</button><button class="btn secondary" data-action="stepMode" data-mode="alternative">${t("אפשרות אחרת", "Try another way")}</button><button class="btn primary" data-action="saveStep">${t("אשמור לנסות", "Save to try")}</button></div></section>${s.risk ? `<div class="callout">${field(s, "risk")}</div>` : ""}<section class="question-box"><h3>${t("שאלה אחת שיכולה לדייק את הצעד", "One question to personalize the next step")}</h3><div class="choice-list"><button class="choice ${chosen === 0 ? "on" : ""}" data-choice="0">${esc(opts[state.lang === "he" ? 0 : 2])}</button><button class="choice ${chosen === 1 ? "on" : ""}" data-choice="1">${esc(opts[state.lang === "he" ? 1 : 3])}</button></div>${guidance}</section><aside class="learn-bridge"><span>◎</span><div><strong>${t("רוצים להבין למה זה קורה?", "Want to understand why this happens?")}</strong><p>${t("פתחו את הפרק המתאים במדריך החזותי וחזרו לכאן כשתרצו לפעול.", "Open the matching visual chapter, then return here when you are ready to act.")}</p></div><a class="btn secondary" href="guide.html#${guideMap[s.id]}">${t("להסבר ולתרשים", "Read and see the diagram")}</a></aside><div class="action-row"><button class="btn ghost" data-action="copyScript">${t("העתיקו משפט לשימוש", "Copy the sentence")}</button><button class="btn ghost" data-action="shareCare">${t("הכינו סיכום לשיתוף", "Prepare caregiver summary")}</button><button class="btn ghost" data-action="done">${t("ניסינו — סגרו לולאה ✓", "Tried it — close the loop ✓")}</button></div></article></div>`;
+  return `<div class="detail-wrap"><button class="back" data-view="scenarios">${t("→ חזרה לכל הסיטואציות", "← Back to situations")}</button><article class="detail"><span class="eyebrow">${t("צעד אחד, בקצב שלכם", "One step, your pace")}</span><h1>${s.emoji} ${title(s)}</h1><p class="summary">${field(s, "desc")}</p><p class="hint">${field(s, "why")}</p><section class="step-panel" aria-label="${t("הצעד הבא", "Next step")}"><div class="tag">✳ Bridget · ${t("מה אפשר לנסות עכשיו", "What to try next")}</div><h2>${field(s, state.stepMode === "small" ? "small" : state.stepMode === "alternative" ? "alternative" : "step")}</h2><div class="script"><strong>${t("משפט שאפשר לומר:", "Words you can use:")}</strong><br>${field(s, "script")}</div><div class="action-row"><button class="btn secondary" data-action="stepMode" data-mode="small">${t("תעשו את זה קטן יותר", "Make it smaller")}</button><button class="btn secondary" data-action="stepMode" data-mode="alternative">${t("אפשרות אחרת", "Try another way")}</button><button class="btn primary" data-action="saveStep">${t("אשמור לנסות", "Save to try")}</button></div></section>${s.risk ? `<div class="callout">${field(s, "risk")}</div>` : ""}<section class="question-box"><h3>${t("שאלה אחת שיכולה לדייק את הצעד", "One question to personalize the next step")}</h3><div class="choice-list"><button class="choice ${chosen === 0 ? "on" : ""}" data-choice="0">${esc(opts[state.lang === "he" ? 0 : 2])}</button><button class="choice ${chosen === 1 ? "on" : ""}" data-choice="1">${esc(opts[state.lang === "he" ? 1 : 3])}</button></div>${guidance}</section><aside class="learn-bridge"><span>◎</span><div><strong>${t("רוצים להבין למה זה קורה?", "Want to understand why this happens?")}</strong><p>${t("פתחו את הפרק המתאים במדריך החזותי וחזרו לכאן כשתרצו לפעול.", "Open the matching visual chapter, then return here when you are ready to act.")}</p></div><a class="btn secondary" href="guide.html#${guideMap[s.id]}">${t("להסבר ולתרשים", "Read and see the diagram")}</a></aside><div class="action-row"><button class="btn ghost" data-action="copyScript">${t("העתיקו משפט לשימוש", "Copy the sentence")}</button><button class="btn ghost" data-action="shareCare">${t("הכינו סיכום לשיתוף", "Prepare caregiver summary")}</button><button class="btn ghost" data-action="done">${t("ניסינו — סגרו לולאה ✓", "Tried it — close the loop ✓")}</button></div></article></div>`;
 }
 function renderLearn() {
   const topics = [
@@ -551,7 +585,7 @@ function renderMine() {
             "",
           )}</div><div class="action-row"><button class="btn secondary" data-action="export">${t("ייצוא הצעדים שלי", "Export my steps")}</button><button class="btn secondary" data-action="clear">${t("מחיקת הכול", "Delete all")}</button></div>`
       : `<div class="empty"><div class="big">🌱</div><h2>${t("עדיין אין כאן צעדים. וזה בסדר.", "No saved steps yet — that is okay.")}</h2><p>${t("בחרו סיטואציה, מצאו פעולה קטנה ושמרו אותה אם תרצו.", "Choose a situation, find a small action, and save it if you want.")}</p><button class="btn primary" data-view="scenarios">${t("בוחרים צעד ראשון", "Choose a first step")}</button></div>`
-  }<div class="section-head"><div><h2>${t("עזרו לנו ללמוד מהפיילוט", "Help improve this pilot")}</h2><p>${t("משוב אנונימי לבחירתכם. לא שולחים דבר אוטומטית.", "Optional feedback. Nothing is sent automatically.")}</p></div></div><div class="detail feedback-form"><label class="form-label" for="feedback">${t("מה עזר? מה היה חסר?", "What helped? What was missing?")}</label><textarea class="field" id="feedback" maxlength="1000" placeholder="${t("לא לכלול שמות ילדים או מידע רפואי אישי", "Please avoid child names or medical details")}"></textarea><div class="action-row"><button class="btn secondary" data-action="copyFeedback">${t("העתיקו משוב לשיתוף", "Copy feedback for sharing")}</button></div><p class="mini-copy">${t("המשוב מועתק למכשיר בלבד. אתם בוחרים למי לשלוח אותו.", "Feedback is copied to your device only. You decide whether and with whom to share it.")}</p></div>`;
+  }<section class="detail"><h2>${t("עזרו לנו ללמוד מהפיילוט", "Help improve the pilot")}</h2><p>${t("שלוש שאלות קצרות, רק אם מתאים לכם. אין שליחה אוטומטית.", "Three short questions, only if you wish. Nothing is sent automatically.")}</p><button class="btn secondary" data-action="pilotFeedback">${t("משוב קצר", "Short feedback")}</button></section>`;
 }
 function toast(msg) {
   if (!IS_BROWSER) return;
@@ -601,6 +635,9 @@ function render() {
   );
   document.getElementById("footerNote").textContent =
     labels[state.lang].disclaimer;
+  document.getElementById("openTab").textContent = t("ברידג׳ט", "Bridget");
+  document.getElementById("floatTab").textContent = t("ברידג׳ט", "Bridget");
+  document.getElementById("floatTab").setAttribute("aria-label", t("עזרה עם ברידג׳ט", "Help with Bridget"));
   document.querySelectorAll("[data-view]").forEach((n) => {
     if (n.closest("nav"))
       n.classList.toggle("selected", n.dataset.view === state.view);
@@ -618,7 +655,7 @@ function render() {
     else n.textContent = labels[state.lang][n.dataset.view] || "";
   }
   const main = document.getElementById("main");
-  main.innerHTML =
+  main.innerHTML = bridgetGuide() +
     (state.view === "home"
       ? renderHome()
       : state.view === "scenarios"
@@ -711,13 +748,13 @@ function closeModal() {
 }
 function modal(content) {
   const root = document.getElementById("modalRoot");
-  root.innerHTML = `<div class="overlay" role="presentation" id="overlay"><section class="drawer" role="dialog" aria-modal="true" aria-label="TAB" id="drawer"><div class="drawer-head"><h2>✳ ${content.heading || "TAB"}</h2><button class="close" id="closeModal" aria-label="${t("סגירה", "Close")}">×</button></div>${content.body}</section></div>`;
+  root.innerHTML = `<div class="overlay" role="presentation" id="overlay"><section class="drawer" role="dialog" aria-modal="true" aria-label="${esc(content.heading || t("ברידג׳ט", "Bridget"))}" id="drawer"><div class="drawer-head"><h2>✳ ${content.heading || "Bridget"}</h2><button class="close" id="closeModal" aria-label="${t("סגירה", "Close")}">×</button></div><div class="modal-bridget" aria-hidden="true"><img src="bridget-next-step.webp" width="48" height="60" alt=""></div>${content.body}</section></div>`;
   document.body.style.overflow = "hidden";
   document.getElementById("closeModal").focus();
 }
 function openTab() {
   modal({
-    heading: "TAB",
+    heading: t("ברידג׳ט", "Bridget"),
     body: `<div class="tab-bot"><div class="preamble">${t("עזרה כאן ועכשיו · ללא AI חיצוני", "Guided help · no external AI")}</div><h3>${t("איזה צעד קטן יעזור כרגע?", "What small step would help right now?")}</h3><p>${t("אני יכולה להציע מסלולי פעולה מתוך תרחישים מוכנים. כרגע זו עזרה מובנית ולא צ׳אט AI חופשי.", "I offer guided actions from prepared scenarios. This is a decision helper, not a live generative AI chat.")}</p></div><div class="prompt-list">${scenarios
       .slice(0, 6)
       .map(
@@ -806,7 +843,7 @@ function caregiverText(s) {
 function privacy() {
   modal({
     heading: t("פרטיות ובטיחות", "Privacy & safety"),
-    body: `<div class="privacy-copy"><h3>${t("אתם בשליטה", "You stay in control")}</h3><p>${t("אין באתר הרשמה או חשבון. צעדים שמורים נשארים בדפדפן המקומי (localStorage). לא נשלח תוכן לשרת, למודל AI, למייל או לאנליטיקה. השיתוף נעשה רק אם אתם מעתיקים את הסיכום בעצמכם.", "No account is needed. Saved steps remain in your browser (localStorage). We do not send content to a server, AI model, email or analytics. Sharing occurs only when you choose to copy a generic summary.")}</p><p>${t("מומלץ לא להקליד שמות ילדים, מידע מזהה או מידע רפואי. מי שיש לו גישה לדפדפן הזה עשוי לראות את הצעדים השמורים. מחיקת נתוני אתר בדפדפן תמחק אותם.", "Avoid entering child names, identifiable information or health details. Anyone with access to this browser may view saved steps. Clearing site data removes them.")}</p><h3>${t("מתי לא להסתפק באתר", "When to seek help elsewhere")}</h3><p>${t("החומר חינוכי ומעשי בלבד; הוא לא מחליף אבחון, טיפול או ייעוץ מקצועי. אין להסיק ממנו אבחנה. במצב של סכנה מיידית פנו לשירותי חירום מקומיים. בחשש לפגיעה או מצוקה מתמשכת פנו לאיש מקצוע מתאים.", "Educational and practical content only; not diagnosis, therapy or professional care. Do not infer a diagnosis. For immediate danger call local emergency services. For abuse concerns or persistent severe distress, seek qualified help.")}</p><p>${t("זוהי גרסת פיילוט. התגובות של TAB מבוססות על מסלולים מוגדרים מראש, לא על מודל AI חי.", "This is a pilot. TAB responses use predefined guided paths, not a live AI model.")}</p></div>`,
+    body: `<div class="privacy-copy"><h3>${t("אתם בשליטה", "You stay in control")}</h3><p>${t("אין באתר הרשמה או חשבון. צעדים שמורים נשארים בדפדפן המקומי (localStorage). לא נשלח תוכן לשרת, למודל AI, למייל או לאנליטיקה. השיתוף נעשה רק אם אתם מעתיקים את הסיכום בעצמכם.", "No account is needed. Saved steps remain in your browser (localStorage). We do not send content to a server, AI model, email or analytics. Sharing occurs only when you choose to copy a generic summary.")}</p><p>${t("מומלץ לא להקליד שמות ילדים, מידע מזהה או מידע רפואי. מי שיש לו גישה לדפדפן הזה עשוי לראות את הצעדים השמורים. מחיקת נתוני אתר בדפדפן תמחק אותם.", "Avoid entering child names, identifiable information or health details. Anyone with access to this browser may view saved steps. Clearing site data removes them.")}</p><h3>${t("מתי לא להסתפק באתר", "When to seek help elsewhere")}</h3><p>${t("החומר חינוכי ומעשי בלבד; הוא לא מחליף אבחון, טיפול או ייעוץ מקצועי. אין להסיק ממנו אבחנה. במצב של סכנה מיידית פנו לשירותי חירום מקומיים. בחשש לפגיעה או מצוקה מתמשכת פנו לאיש מקצוע מתאים.", "Educational and practical content only; not diagnosis, therapy or professional care. Do not infer a diagnosis. For immediate danger call local emergency services. For abuse concerns or persistent severe distress, seek qualified help.")}</p><p>${t("זוהי גרסת פיילוט. התגובות של Bridget מבוססות על מסלולים מוגדרים מראש, לא על מודל AI חי.", "This is a pilot. Bridget responses use predefined guided paths, not a live AI model.")}</p></div>`,
   });
 }
 function actions(event) {
@@ -968,13 +1005,15 @@ function actions(event) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return;
   }
+  if (action === "pilotFeedback") { openPilotFeedback(); return; }
   if (action === "copyFeedback") {
-    const el = document.getElementById("feedback");
-    if (!el.value.trim()) {
-      toast(t("כתבו משוב קצר קודם", "Please write feedback first"));
-      return;
-    }
-    copyText(el.value.slice(0, 1000));
+    const form = document.getElementById("pilotForm");
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    const text = pilotFeedbackText(values);
+    if (!text) return;
+    copyText(text);
+    document.getElementById("feedbackStatus").textContent = t("בחרתם להעתיק. המשוב לא נשלח לצוות; הדביקו אותו בשיחה עם מי שהזמין אתכם לפיילוט. אין צורך לשלוח שוב את אותו משוב.", "You chose to copy. Feedback has not been sent to the team; paste it into your conversation with your pilot organizer. No need to resend the same response.");
     return;
   }
 }
@@ -1059,4 +1098,4 @@ if (IS_BROWSER) {
   else bind();
 }
 if (typeof module !== "undefined")
-  module.exports = { scenarios, esc, labels, initial, guideMap };
+  module.exports = { scenarios, esc, labels, initial, guideMap, pilotFeedbackText, pilotQuestions, bridgetGuide, state, openPilotFeedback, actions };
