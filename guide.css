@@ -27,3 +27,5 @@ body{font-family:Arial,sans-serif;background:#f5f8fa;color:#203047;margin:0;line
 .arena-audio-status{min-height:1.4em;margin:0;padding:0 24px;color:#345466;font-size:.88rem}
 .arena-icon:focus-visible{outline:3px solid #725aa6;outline-offset:3px}
 @media(max-width:680px){.arena-audio-status{padding:0 14px}.arena-tools{flex-wrap:wrap;justify-content:flex-end}}
+
+.guide-bridget{object-fit:cover;border-radius:12px;float:inline-end;margin-inline-start:10px;animation:guide-bridget-arrive .7s ease-out 1}@keyframes guide-bridget-arrive{from{opacity:.5;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@media(prefers-reduced-motion:reduce){.guide-bridget{animation:none}}.tab-calm .guide-bridget{animation:none}

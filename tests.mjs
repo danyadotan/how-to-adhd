@@ -27,3 +27,43 @@ test('manual recording preparation checks local files without a browser API key'
   assert.match(prepare,/clip\.url =/);
   assert.match(prepare,/--generate/);
 });
+
+const pilot = require('./app.js');
+test('pilot export requires explicit consent and valid closed answers',()=>{
+ const answers={relevance:'yes',action:'not_yet',return:'maybe'};
+ assert.equal(pilot.pilotFeedbackText(answers),null);
+ assert.equal(pilot.pilotFeedbackText({...answers,consent:'yes',action:'injected personal text'}),null);
+ assert.equal(pilot.pilotFeedbackText({...answers,consent:'yes',barrier:'private text'}),null);
+ const report=pilot.pilotFeedbackText({...answers,consent:'yes',name:'PRIVATE',scenario:'PRIVATE',saved:'PRIVATE'});
+ assert.ok(report.includes('עוד לא ניסיתי'));assert.ok(report.includes('Prefer not to answer'));
+ assert.ok(!report.includes('PRIVATE'));assert.ok(!report.includes('undefined'));
+ for(const [key,,,options] of pilot.pilotQuestions) for(const [id] of options)
+   assert.ok(pilot.pilotFeedbackText({...answers,consent:'yes',[key]:id}));
+});
+test('Bridget guidance follows situation, adaptation and return in both languages',()=>{
+ for(const lang of ['he','en']){pilot.state.lang=lang;
+ for(const view of ['home','scenarios','detail','learn','tools','mine']){
+ pilot.state.view=view;const html=pilot.bridgetGuide();assert.match(html,/data-action="pilotFeedback"/);assert.match(html,/aria-current="step"/);assert.match(html,/bridget-next-step.webp/);
+ }
+ pilot.state.view='detail';pilot.state.stepMode='small';assert.match(pilot.bridgetGuide(),lang==='he'?/מצאתם דרך/:/Found a better fit/);
+ pilot.state.stepMode='normal';pilot.state.followQuestion=null;
+ }
+ Object.assign(pilot.state,pilot.initial);
+});
+test('feedback action blocks invalid form and copies only after explicit consent',async()=>{
+ const old={document:global.document,FormData:global.FormData,window:global.window,navigator:Object.getOwnPropertyDescriptor(global,'navigator')};
+ let valid=false,copies=[],data={relevance:'yes',action:'partly',return:'yes'},status={textContent:''};
+ global.document={getElementById:id=>id==='pilotForm'?{reportValidity:()=>valid}:status};
+ global.FormData=class { *[Symbol.iterator](){yield* Object.entries(data)} };
+ global.window={isSecureContext:true};
+ Object.defineProperty(global,'navigator',{configurable:true,value:{clipboard:{writeText:async text=>copies.push(text)}}});
+ const event={target:{closest:()=>({dataset:{action:'copyFeedback'}})}};
+ try{
+ pilot.actions(event);assert.equal(copies.length,0);
+ valid=true;pilot.actions(event);assert.equal(copies.length,0);
+ data.consent='yes';pilot.actions(event);await Promise.resolve();assert.equal(copies.length,1);assert.match(copies[0],/חלק ממנו/);assert.ok(status.textContent);
+ }finally{
+ for(const key of ['document','FormData','window']){if(old[key]===undefined)delete global[key];else global[key]=old[key]}
+ if(old.navigator)Object.defineProperty(global,'navigator',old.navigator);else delete global.navigator;
+ }
+});
